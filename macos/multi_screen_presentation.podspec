@@ -4,7 +4,7 @@
 #
 Pod::Spec.new do |s|
   s.name             = 'multi_screen_presentation'
-  s.version          = '1.0.1'
+  s.version          = '1.0.2'
   s.summary          = 'Multi-screen presentation windows for Flutter macOS.'
   s.description      = <<-DESC
   Native window management, screen enumeration and Flutter-to-Flutter data bridge.

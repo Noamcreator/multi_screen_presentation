@@ -1,6 +1,8 @@
+## 1.0.2
+- Fix: Resolved a major issue on Windows where new windows (liveFlutterEngine) were unable to run plugins. Plugins are now correctly registered with the new Flutter engine's PluginRegistrar upon creation.
+
 ## 1.0.1
-- Fix: Correction d'un problème majeur sur Windows où la nouvelle fenêtre (liveFlutterEngine) ne pouvait pas exécuter  les plugins. Les plugins sont désormais correctement enregistrés auprès du PluginRegistrar du nouveau moteur Flutter au moment de sa création.
-- Corecting dart files warnings.
+- Correcting Dart file warnings.
 
 ## 1.0.0
 

@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'multi_screen_presentation'
-  s.version          = '1.0.1'
+  s.version          = '1.0.2'
   s.summary          = 'Multi-screen presentation (iPad UIScene external display).'
   s.homepage         = 'https://github.com/Noamcreator/multi_screen_presentation'
   s.license          = { :file => '../LICENSE' }
