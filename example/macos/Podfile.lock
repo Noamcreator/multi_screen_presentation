@@ -1,0 +1,22 @@
+PODS:
+  - FlutterMacOS (1.0.0)
+  - multi_screen_presentation (1.0.0):
+    - FlutterMacOS
+
+DEPENDENCIES:
+  - FlutterMacOS (from `Flutter/ephemeral`)
+  - multi_screen_presentation (from `Flutter/ephemeral/.symlinks/plugins/multi_screen_presentation/macos`)
+
+EXTERNAL SOURCES:
+  FlutterMacOS:
+    :path: Flutter/ephemeral
+  multi_screen_presentation:
+    :path: Flutter/ephemeral/.symlinks/plugins/multi_screen_presentation/macos
+
+SPEC CHECKSUMS:
+  FlutterMacOS: d0db08ddef1a9af05a5ec4b724367152bb0500b1
+  multi_screen_presentation: faedcf8c93a1ff1566bad091a1a9efe43719933c
+
+PODFILE CHECKSUM: 54d867c82ac51cbd61b565781b9fada492027009
+
+COCOAPODS: 1.16.2

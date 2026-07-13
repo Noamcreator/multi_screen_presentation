@@ -1,0 +1,37 @@
+name: multi_screen_presentation
+description: A Flutter plugin to open system settings panels (WiFi, Bluetooth, NFC, Display, etc.) on Android, iOS, Windows, macOS, and Linux.
+version: 1.0.0
+homepage: https://github.com/Noamcreator/multi_screen_presentation
+repository: https://github.com/Noamcreator/multi_screen_presentation
+issue_tracker: https://github.com/Noamcreator/multi_screen_presentation/issues
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+  flutter: '>=3.3.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  plugin_platform_interface: ^2.1.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: me.noam.multi_screen_presentation
+        pluginClass: MultiScreenPresentationPlugin
+      ios:
+        pluginClass: MultiScreenPresentationPlugin
+        swiftPackageManager: true
+      windows:
+        pluginClass: MultiScreenPresentationPluginCApi
+      macos:
+        pluginClass: MultiScreenPresentationPlugin
+        swiftPackageManager: true
+      linux:
+        pluginClass: MultiScreenPresentationPlugin
