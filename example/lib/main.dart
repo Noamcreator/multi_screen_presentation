@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:multi_screen_presentation/multi_screen_presentation.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 
 // =========================================================================
 // 1. DEFINITION DES PAGES / SLIDES
@@ -46,18 +47,79 @@ class SharedPageContent extends StatelessWidget {
           ),
         );
       case AppRoute.statistiques:
-        return const Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.bar_chart, size: 80, color: Colors.green),
-              SizedBox(height: 16),
-              Text("TABLEAU DE BORD", style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
-              Text("Données et statistiques en direct", style: TextStyle(color: Colors.grey)),
-            ],
-          ),
-        );
+        // On appelle ici un vrai plugin tiers (device_info_plus) depuis
+        // cette page, qu'elle soit affichée dans la fenêtre principale
+        // (aperçu) ou dans le moteur Flutter secondaire créé par notre
+        // plugin natif. C'est le test de bout en bout : si l'enregistrement
+        // des plugins sur la 2e fenêtre est cassé, on verra une
+        // MissingPluginException s'afficher ci-dessous au lieu des infos.
+        return const _DeviceInfoStatsView();
     }
+  }
+}
+
+class _DeviceInfoStatsView extends StatefulWidget {
+  const _DeviceInfoStatsView();
+
+  @override
+  State<_DeviceInfoStatsView> createState() => _DeviceInfoStatsViewState();
+}
+
+class _DeviceInfoStatsViewState extends State<_DeviceInfoStatsView> {
+  String? _summary;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDeviceInfo();
+  }
+
+  Future<void> _loadDeviceInfo() async {
+    try {
+      final deviceInfoPlugin = DeviceInfoPlugin();
+      final info = await deviceInfoPlugin.windowsInfo;
+      if (!mounted) return;
+      setState(() {
+        _summary =
+            '${info.computerName}\n'
+            'Build Windows: ${info.buildNumber}\n'
+            '${info.numberOfCores} cœurs • ${(info.systemMemoryInMegabytes / 1024).toStringAsFixed(1)} Go RAM';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.bar_chart, size: 80, color: Colors.green),
+          const SizedBox(height: 16),
+          const Text("TABLEAU DE BORD", style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Text(
+                "Échec du plugin device_info_plus :\n$_error",
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.red),
+              ),
+            )
+          else if (_summary != null)
+            Text(_summary!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey))
+          else
+            const CircularProgressIndicator(),
+        ],
+      ),
+    );
   }
 }
 

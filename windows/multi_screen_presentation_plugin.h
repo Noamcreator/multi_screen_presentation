@@ -20,8 +20,9 @@ struct PresentationWindow {
   bool isFullscreen = false;
   RECT floatingRect{};
   bool useLiveEngine = true;
-  // REMPLACE l'ancien unique_ptr de FlutterViewController :
-  FlutterDesktopViewControllerRef viewController = nullptr; 
+  // Handle brut de l'API C (flutter::FlutterViewController n'est PAS
+  // linkable depuis un plugin, voir la note dans multi_screen_presentation_plugin.cpp).
+  FlutterDesktopViewControllerRef viewController = nullptr;
   // Permet de maintenir en vie le messager binaire pour le MethodChannel :
   std::unique_ptr<flutter::BinaryMessenger> binaryMessenger;
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> windowChannel;

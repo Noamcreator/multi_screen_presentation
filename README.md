@@ -199,6 +199,28 @@ class _PresentationAppState extends State<PresentationApp> {
   }
 }
 ```
+---
+
+## Setup for windows
+
+Go to the `example/windows` folder and open the `main.cpp` file.
+
+In the `main.cpp` file, add the following line at the top of the file:
+```cpp
+#include "flutter/generated_plugin_registrant.h"
+#include <multi_screen_presentation/multi_screen_presentation_plugin_c_api.h>
+
+int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
+                      _In_ wchar_t *command_line, _In_ int show_command) {
+  ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+
+  // Essential: without this call, third-party plugins will not work
+  // in secondary windows (contentMode: liveFlutterEngine).
+  MultiScreenPresentationPluginSetRegisterPluginsCallback(
+      reinterpret_cast<void*>(RegisterPlugins));
+
+  // ... rest of wWinMain remains unchanged ...
+}
 
 ---
 

@@ -1,6 +1,6 @@
 name: multi_screen_presentation
-description: A Flutter plugin to open system settings panels (WiFi, Bluetooth, NFC, Display, etc.) on Android, iOS, Windows, macOS, and Linux.
-version: 1.0.2
+description: A comprehensive Flutter plugin to manage presentation windows on secondary screens with customizable properties.
+version: 1.0.3
 homepage: https://github.com/Noamcreator/multi_screen_presentation
 repository: https://github.com/Noamcreator/multi_screen_presentation
 issue_tracker: https://github.com/Noamcreator/multi_screen_presentation/issues

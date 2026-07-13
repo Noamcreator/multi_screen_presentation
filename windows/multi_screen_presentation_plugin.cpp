@@ -2,12 +2,30 @@
 
 #include <flutter/standard_method_codec.h>
 #include <flutter/event_stream_handler_functions.h>
+#include <flutter/plugin_registry.h>
 
 #include <algorithm>
 #include <sstream>
 #include <variant>
 
-typedef void (*RegisterPluginsFunc)(FlutterDesktopEngineRef);
+// IMPORTANT: cette signature doit correspondre EXACTEMENT à celle de
+// `RegisterPlugins` générée par Flutter dans generated_plugin_registrant.h,
+// c'est-à-dire `void RegisterPlugins(flutter::PluginRegistry* registry)`.
+// L'ancienne version prenait un FlutterDesktopEngineRef (handle C brut), ce
+// qui provoquait un mismatch d'ABI : RegisterPlugins() interprétait ce
+// handle comme un objet C++ flutter::PluginRegistry*, donc les plugins
+// tiers ne s'enregistraient jamais correctement sur le messenger de la 2e
+// fenêtre -> d'où le "MissingPluginException / not implemented".
+//
+// NOTE: on ne peut PAS utiliser flutter::FlutterEngine / FlutterViewController
+// / DartProject ici : leur implémentation (.cc) n'est compilée que dans
+// flutter_wrapper_app (lié au runner .exe), pas dans flutter_wrapper_plugin
+// (lié aux plugins). Les utiliser depuis un plugin donne des LNK2019. On
+// reste donc sur l'API C pure (FlutterDesktopEngineRef, etc.), exportée par
+// flutter_windows.dll et donc accessible depuis le plugin. Voir plus bas la
+// classe RawEnginePluginRegistry qui fournit un vrai flutter::PluginRegistry*
+// sans dépendre de FlutterEngine.
+typedef void (*RegisterPluginsFunc)(flutter::PluginRegistry *);
 extern RegisterPluginsFunc g_register_plugins_cb;
 
 namespace multi_screen_presentation {
@@ -135,6 +153,28 @@ class RawBinaryMessenger : public flutter::BinaryMessenger {
   std::vector<std::unique_ptr<flutter::BinaryMessageHandler>> handlers_;
 };
 
+// Petite implémentation locale de flutter::PluginRegistry, adossée à un
+// FlutterDesktopEngineRef brut. flutter::PluginRegistry est une interface
+// purement virtuelle définie dans plugin_registry.h (header-only, aucun
+// .cc à linker), donc on peut la sous-classer directement ici sans
+// dépendre de flutter::FlutterEngine (qui, lui, n'est pas linkable depuis
+// un plugin — voir la note plus haut). GetRegistrarForPlugin() délègue
+// simplement à la fonction C FlutterDesktopEngineGetPluginRegistrar,
+// exportée par flutter_windows.dll.
+class RawEnginePluginRegistry : public flutter::PluginRegistry {
+ public:
+  explicit RawEnginePluginRegistry(FlutterDesktopEngineRef engine)
+      : engine_(engine) {}
+
+  FlutterDesktopPluginRegistrarRef GetRegistrarForPlugin(
+      const std::string &plugin_name) override {
+    return FlutterDesktopEngineGetPluginRegistrar(engine_, plugin_name.c_str());
+  }
+
+ private:
+  FlutterDesktopEngineRef engine_;
+};
+
 FlutterDesktopViewControllerRef CreateSecondaryFlutterView(
     int width, int height, const std::string &entrypoint) {
   std::wstring dir = GetExecutableDir();
@@ -157,8 +197,13 @@ FlutterDesktopViewControllerRef CreateSecondaryFlutterView(
     return nullptr;
   }
 
+  // Enregistre tous les plugins Dart du projet (y compris les tiers) sur
+  // ce moteur secondaire, via un vrai flutter::PluginRegistry* (voir
+  // RawEnginePluginRegistry ci-dessus) — c'est ce qui corrige le
+  // MissingPluginException sur la 2e fenêtre.
   if (g_register_plugins_cb != nullptr) {
-    g_register_plugins_cb(engine);
+    RawEnginePluginRegistry registry(engine);
+    g_register_plugins_cb(&registry);
   }
 
   return FlutterDesktopViewControllerCreate(width, height, engine);
@@ -489,7 +534,7 @@ std::string MultiScreenPresentationPlugin::OpenWindow(const EncodableMap &args) 
     if (window->viewController) {
       FlutterDesktopViewRef flutterView = FlutterDesktopViewControllerGetView(window->viewController);
       HWND flutterHwnd = FlutterDesktopViewGetHWND(flutterView);
-      
+
       ::SetParent(flutterHwnd, hwnd);
       ::MoveWindow(flutterHwnd, 0, 0, w, h, TRUE);
 
@@ -498,7 +543,7 @@ std::string MultiScreenPresentationPlugin::OpenWindow(const EncodableMap &args) 
 
       FlutterDesktopEngineRef engineRef = FlutterDesktopViewControllerGetEngine(window->viewController);
       FlutterDesktopMessengerRef messengerRef = FlutterDesktopEngineGetMessenger(engineRef);
-      
+
       window->binaryMessenger = std::make_unique<RawBinaryMessenger>(messengerRef);
 
       window->windowChannel = std::make_unique<flutter::MethodChannel<EncodableValue>>(
