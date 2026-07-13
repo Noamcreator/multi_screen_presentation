@@ -13,7 +13,7 @@ import 'screen_info.dart';
 ///
 /// Le natif fait le pont entre le moteur Flutter principal et le(s)
 /// moteur(s) Flutter secondaire(s) ouverts dans les fenêtres de
-/// présentation, sur les canaux "multi_screen_presentation/window/<id>".
+/// présentation, sur les canaux "multi_screen_presentation/window/id".
 class MethodChannelMultiScreenPresentation
     extends MultiScreenPresentationPlatform {
   final MethodChannel methodChannel =

@@ -154,6 +154,11 @@ FlutterDesktopViewControllerRef CreateSecondaryFlutterView(
     return nullptr;
   }
 
+  FlutterDesktopPluginRegistrarRef newEngineRegistrar = 
+      FlutterDesktopEngineGetPluginRegistrar(engine, "MultiScreenPresentationPlugin");
+
+  MultiScreenPresentationPluginCApiRegisterWithRegistrar(newEngineRegistrar);
+
   return FlutterDesktopViewControllerCreate(width, height, engine);
 }
 
@@ -477,7 +482,7 @@ std::string MultiScreenPresentationPlugin::OpenWindow(const EncodableMap &args) 
     if (auto it = args.find(EncodableValue("entrypoint")); it != args.end())
       entrypoint = std::get<std::string>(it->second);
 
-    window->viewController = CreateSecondaryFlutterView(w, h, entrypoint);
+    window->viewController = CreateSecondaryFlutterView(w, h, entrypoint, registrar_->GetView());
 
     if (window->viewController) {
       FlutterDesktopViewRef flutterView = FlutterDesktopViewControllerGetView(window->viewController);
