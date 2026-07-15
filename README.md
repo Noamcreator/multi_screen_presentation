@@ -221,6 +221,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
 
   // ... rest of wWinMain remains unchanged ...
 }
+```
 
 ---
 
