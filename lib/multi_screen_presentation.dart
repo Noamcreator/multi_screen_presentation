@@ -1,5 +1,3 @@
-library multi_screen_presentation;
-
 export 'src/models.dart';
 export 'src/screen_info.dart';
 export 'src/window.dart';

@@ -1,3 +1,8 @@
+## 1.0.8
+
+- Fixed iOS build failure.
+- On macOS, plugins can now be launched in a new window.
+
 ## 1.0.7
 
 - **iOS/SPM**: Fixed a critical compilation issue (`Module 'multi_screen_presentation' not found`) on iOS devices and simulators when building with Flutter's Swift Package Manager (SPM) pipeline. Added the explicit source directory path mapping to `Package.swift`.

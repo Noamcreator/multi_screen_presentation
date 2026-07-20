@@ -100,9 +100,13 @@ class PresentationWindowController: NSObject, NSWindowDelegate {
     if useLiveEngine {
       let engine = FlutterEngine(name: "presentation_\(id)", project: FlutterDartProject())
       engine.run(withEntrypoint: entrypoint)
-      // Enregistre les plugins générés (adapter selon le projet hôte,
-      // voir GeneratedPluginRegistrant dans l'app macOS).
-      // GeneratedPluginRegistrant.register(with: engine)
+      
+      // Étape 2 : Utiliser le hook au lieu d'appeler directement RegisterGeneratedPlugins
+      if let registerHook = MultiScreenPresentationPlugin.registerPluginsHook {
+        registerHook(engine)
+      } else {
+        print("Warning: registerPluginsHook n'est pas défini. Les plugins ne seront pas disponibles sur cette vue.")
+      }
 
       let vc = FlutterViewController(engine: engine, nibName: nil, bundle: nil)
       self.engine = engine

@@ -1,6 +1,7 @@
 name: multi_screen_presentation_example
 description: "Demonstrates how to use the multi_screen_presentation plugin."
 publish_to: 'none'
+version: 1.0.0
 
 environment:
   sdk: ^3.12.2

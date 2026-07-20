@@ -76,18 +76,41 @@ class _DeviceInfoStatsViewState extends State<_DeviceInfoStatsView> {
   }
 
   Future<void> _loadDeviceInfo() async {
+    final deviceInfoPlugin = DeviceInfoPlugin();
+
     try {
-      final deviceInfoPlugin = DeviceInfoPlugin();
-      final info = await deviceInfoPlugin.windowsInfo;
-      if (!mounted) return;
-      setState(() {
-        _summary =
-            '${info.computerName}\n'
-            'Build Windows: ${info.buildNumber}\n'
-            '${info.numberOfCores} cœurs • ${(info.systemMemoryInMegabytes / 1024).toStringAsFixed(1)} Go RAM';
-      });
+      if (Platform.isWindows) {
+        // Ce qui s'exécute sur Windows
+        final windowsInfo = await deviceInfoPlugin.windowsInfo;
+        setState(() {
+          _summary = "PC : ${windowsInfo.computerName}";
+        });
+      } else if (Platform.isMacOS) {
+        // Ce qui doit s'exécuter sur votre Mac !
+        final macInfo = await deviceInfoPlugin.macOsInfo;
+        setState(() {
+          _summary = "Mac : ${macInfo.computerName} (${macInfo.model})";
+        });
+      } else if (Platform.isLinux) {
+        // Ce qui s'exécute sur Linux !
+        final linuxInfo = await deviceInfoPlugin.linuxInfo;
+        setState(() {
+          _summary = "Linux : ${linuxInfo.prettyName}";
+        });
+      } else if (Platform.isAndroid) {
+        // Ce qui s'exécute sur Android !
+        final androidInfo = await deviceInfoPlugin.androidInfo;
+        setState(() {
+          _summary = "Android : ${androidInfo.brand} ${androidInfo.model} (SDK ${androidInfo.version.sdkInt})";
+        });
+      } else if (Platform.isIOS) {
+        // Ce qui s'exécute sur iOS !
+        final iosInfo = await deviceInfoPlugin.iosInfo;
+        setState(() {
+          _summary = "iOS : ${iosInfo.name} (${iosInfo.model} ${iosInfo.systemVersion})";
+        });
+      }
     } catch (e) {
-      if (!mounted) return;
       setState(() {
         _error = e.toString();
       });

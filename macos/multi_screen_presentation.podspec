@@ -4,7 +4,7 @@
 #
 Pod::Spec.new do |s|
   s.name             = 'multi_screen_presentation'
-  s.version          = '1.0.7'
+  s.version          = '1.0.8'
   s.summary          = 'A comprehensive Flutter plugin to manage presentation windows on secondary screens with customizable properties.'
   s.description      = <<-DESC
   A comprehensive Flutter plugin to manage presentation windows on secondary screens with customizable properties.
@@ -15,10 +15,6 @@ Pod::Spec.new do |s|
 
   s.source           = { :path => '.' }
   s.source_files     = 'multi_screen_presentation/Sources/multi_screen_presentation/**/*'
-
-  s.resource_bundles = {
-    'multi_screen_presentation_privacy' => ['multi_screen_presentation/Sources/multi_screen_presentation/PrivacyInfo.xcprivacy']
-  }
 
   s.dependency 'FlutterMacOS'
 

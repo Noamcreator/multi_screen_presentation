@@ -3,6 +3,8 @@ import FlutterMacOS
 
 public class MultiScreenPresentationPlugin: NSObject, FlutterPlugin {
 
+  public static var registerPluginsHook: ((FlutterPluginRegistry) -> Void)?
+  
   static var eventSink: FlutterEventSink?
   var windows: [String: PresentationWindowController] = [:]
   var mainChannel: FlutterMethodChannel!

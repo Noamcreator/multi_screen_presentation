@@ -1,21 +1,27 @@
 PODS:
+  - device_info_plus (0.0.1):
+    - FlutterMacOS
   - FlutterMacOS (1.0.0)
-  - multi_screen_presentation (1.0.7):
+  - multi_screen_presentation (1.0.8):
     - FlutterMacOS
 
 DEPENDENCIES:
+  - device_info_plus (from `Flutter/ephemeral/.symlinks/plugins/device_info_plus/macos`)
   - FlutterMacOS (from `Flutter/ephemeral`)
   - multi_screen_presentation (from `Flutter/ephemeral/.symlinks/plugins/multi_screen_presentation/macos`)
 
 EXTERNAL SOURCES:
+  device_info_plus:
+    :path: Flutter/ephemeral/.symlinks/plugins/device_info_plus/macos
   FlutterMacOS:
     :path: Flutter/ephemeral
   multi_screen_presentation:
     :path: Flutter/ephemeral/.symlinks/plugins/multi_screen_presentation/macos
 
 SPEC CHECKSUMS:
+  device_info_plus: 4fb280989f669696856f8b129e4a5e3cd6c48f76
   FlutterMacOS: d0db08ddef1a9af05a5ec4b724367152bb0500b1
-  multi_screen_presentation: faedcf8c93a1ff1566bad091a1a9efe43719933c
+  multi_screen_presentation: 44986d3509113413561d4c9aae2463e9c8b161bf
 
 PODFILE CHECKSUM: 54d867c82ac51cbd61b565781b9fada492027009
 
