@@ -66,19 +66,24 @@ class MethodChannelMultiScreenPresentation
 
   @override
   Future<void> setWindowPosition(String windowId, int x, int y) {
+    // NB: le natif Linux fait fl_value_get_float() sur ces valeurs, donc on
+    // doit envoyer des double (sinon assertion FL_VALUE_TYPE_FLOAT côté GTK
+    // et la position retombe à 0).
     return methodChannel.invokeMethod('setWindowPosition', {
       'windowId': windowId,
-      'x': x,
-      'y': y,
+      'x': x.toDouble(),
+      'y': y.toDouble(),
     });
   }
 
   @override
   Future<void> setWindowSize(String windowId, int width, int height) {
+    // Idem : sans .toDouble(), width/height arrivent à 0 côté natif ->
+    // "gtk_window_resize: assertion 'width > 0' failed".
     return methodChannel.invokeMethod('setWindowSize', {
       'windowId': windowId,
-      'width': width,
-      'height': height,
+      'width': width.toDouble(),
+      'height': height.toDouble(),
     });
   }
 
@@ -92,10 +97,10 @@ class MethodChannelMultiScreenPresentation
   }) {
     return methodChannel.invokeMethod('setWindowBounds', {
       'windowId': windowId,
-      'x': x,
-      'y': y,
-      'width': width,
-      'height': height,
+      'x': x.toDouble(),
+      'y': y.toDouble(),
+      'width': width.toDouble(),
+      'height': height.toDouble(),
     });
   }
 

@@ -120,12 +120,19 @@ class WindowOptions {
     };
 
     if (position != null) {
-      map['x'] = position!.x;
-      map['y'] = position!.y;
+      // IMPORTANT: le natif Linux lit ces valeurs avec fl_value_get_float(),
+      // qui exige un FL_VALUE_TYPE_FLOAT. Envoyer un int brut ici provoque
+      // "assertion 'self->type == FL_VALUE_TYPE_FLOAT' failed" côté GTK et
+      // fait retomber x/y à 0.
+      map['x'] = position!.x.toDouble();
+      map['y'] = position!.y.toDouble();
     }
     if (size != null) {
-      map['width'] = size!.width;
-      map['height'] = size!.height;
+      // Même remarque que ci-dessus : sans .toDouble(), width/height
+      // arrivent à 0 côté natif -> "gtk_window_resize: assertion
+      // 'width > 0' failed" et échec de création du contexte OpenGL.
+      map['width'] = size!.width.toDouble();
+      map['height'] = size!.height.toDouble();
     }
     if (opacity != null) {
       map['opacity'] = opacity;

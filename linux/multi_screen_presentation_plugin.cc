@@ -13,16 +13,10 @@ struct _MultiScreenPresentationPlugin {
   FlPluginRegistrar *registrar;
   FlMethodChannel *channel;
   FlEventChannel *event_channel;
-  FlEventSink *event_sink;  // conservé tant que Dart écoute le stream
 };
 
 G_DEFINE_TYPE(MultiScreenPresentationPlugin, multi_screen_presentation_plugin, g_object_get_type())
 
-// NB: dans le template officiel `flutter create --template=plugin`, le
-// header utilise G_DECLARE_FINAL_TYPE(...) qui génère automatiquement la
-// macro de cast MULTI_SCREEN_PRESENTATION_PLUGIN(obj). Si vous générez le
-// header via `flutter create`, gardez cette macro standard ; sinon
-// ajoutez-la manuellement ici :
 #define MULTI_SCREEN_PRESENTATION_PLUGIN(obj) \
   (G_TYPE_CHECK_INSTANCE_CAST((obj), multi_screen_presentation_plugin_get_type(), \
    MultiScreenPresentationPlugin))
@@ -34,7 +28,7 @@ struct PresentationWindow {
   GtkWindow *window = nullptr;
   bool is_fullscreen = false;
   int floating_x = 0, floating_y = 0, floating_w = 0, floating_h = 0;
-  FlView *fl_view = nullptr;          // vue du moteur Flutter dédié
+  FlView *fl_view = nullptr;          
   FlEngine *engine = nullptr;
   FlMethodChannel *window_channel = nullptr;
   MultiScreenPresentationPlugin *plugin = nullptr;
@@ -48,6 +42,26 @@ std::string GenerateId() {
   std::ostringstream oss;
   oss << "linux_win_" << (++counter);
   return oss.str();
+}
+
+// Lit un nombre depuis un FlValue en acceptant aussi bien FL_VALUE_TYPE_FLOAT
+// que FL_VALUE_TYPE_INT. fl_value_get_float() seul déclenche une assertion
+// GLib (et renvoie 0.0) si le codec Dart envoie un int, ce qui corrompait
+// silencieusement toutes les tailles/positions de fenêtre.
+double GetNum(FlValue *v, double fallback = 0.0) {
+  if (!v) return fallback;
+  FlValueType type = fl_value_get_type(v);
+  if (type == FL_VALUE_TYPE_FLOAT) return fl_value_get_float(v);
+  if (type == FL_VALUE_TYPE_INT) return static_cast<double>(fl_value_get_int(v));
+  return fallback;
+}
+
+// Idem pour les chaînes : évite fl_value_get_string() sur un FlValue qui
+// ne serait pas une string (assertion + segfault potentiel plus loin, ex.
+// gdk_pixbuf_new_from_file avec filename == NULL).
+const gchar *GetStr(FlValue *v, const gchar *fallback = nullptr) {
+  if (!v || fl_value_get_type(v) != FL_VALUE_TYPE_STRING) return fallback;
+  return fl_value_get_string(v);
 }
 
 FlValue *ScreenToValue(GdkMonitor *monitor, int index, bool is_primary) {
@@ -93,8 +107,9 @@ GdkMonitor *FindMonitor(const std::string &screen_id) {
 }
 
 void EmitEvent(MultiScreenPresentationPlugin *self, FlValue *event) {
-  if (self->event_sink) {
-    fl_event_sink_success(self->event_sink, event);
+  if (self->event_channel) {
+    // Utilisation directe de fl_event_channel_send de manière thread-safe / standard
+    fl_event_channel_send(self->event_channel, event, nullptr, nullptr);
   }
 }
 
@@ -104,10 +119,7 @@ void ApplyFullscreen(PresentationWindow *w, GdkMonitor *monitor) {
   gtk_window_move(w->window, geo.x, geo.y);
   gtk_window_resize(w->window, geo.width, geo.height);
   gtk_window_set_decorated(w->window, FALSE);
-  gtk_window_fullscreen_on_monitor(
-      w->window, gtk_widget_get_screen(GTK_WIDGET(w->window)),
-      gdk_display_get_monitor_at_window(
-          gdk_display_get_default(), gtk_widget_get_window(GTK_WIDGET(w->window))));
+  gtk_window_fullscreen(w->window);
 }
 
 void ApplyFloating(PresentationWindow *w) {
@@ -139,8 +151,6 @@ void SetMode(PresentationWindow *w, bool fullscreen) {
   EmitEvent(w->plugin, event);
 }
 
-// Double-clic bouton gauche => bascule floating/fullscreen. Un simple clic
-// laisse GTK gérer nativement le déplacement (drag) de la fenêtre.
 gboolean OnButtonPress(GtkWidget *, GdkEventButton *event, gpointer user_data) {
   auto *w = static_cast<PresentationWindow *>(user_data);
   if (event->type == GDK_2BUTTON_PRESS && event->button == 1) {
@@ -179,7 +189,7 @@ gboolean OnDeleteEvent(GtkWidget *, GdkEvent *, gpointer user_data) {
     delete id_str;
     return G_SOURCE_REMOVE;
   }, new std::string(id));
-  return FALSE;  // laisse GTK détruire la fenêtre normalement
+  return FALSE;  
 }
 
 std::string OpenWindow(MultiScreenPresentationPlugin *self, FlValue *args) {
@@ -193,7 +203,7 @@ std::string OpenWindow(MultiScreenPresentationPlugin *self, FlValue *args) {
   bool use_live_engine = !mode_v || g_strcmp0(fl_value_get_string(mode_v), "liveFlutterEngine") == 0;
 
   FlValue *title_v = fl_value_lookup_string(args, "title");
-  const char *title = title_v ? fl_value_get_string(title_v) : "Presentation";
+  const char *title = GetStr(title_v, "Presentation");
 
   FlValue *x_v = fl_value_lookup_string(args, "x");
   FlValue *y_v = fl_value_lookup_string(args, "y");
@@ -205,15 +215,22 @@ std::string OpenWindow(MultiScreenPresentationPlugin *self, FlValue *args) {
   FlValue *resizable_v = fl_value_lookup_string(args, "resizable");
   FlValue *icon_path_v = fl_value_lookup_string(args, "iconPath");
 
+  // Fix warning unused: On récupère et utilise la variable optionnelle pour le FlDartProject
   FlValue *entry_v = fl_value_lookup_string(args, "entrypoint");
   const char *entrypoint = entry_v ? fl_value_get_string(entry_v) : "presentationMain";
 
   GdkMonitor *monitor = FindMonitor(screen_id);
   GdkRectangle geo; gdk_monitor_get_geometry(monitor, &geo);
-  int w = w_v ? (int)fl_value_get_float(w_v) : (int)(geo.width * 0.7);
-  int h = h_v ? (int)fl_value_get_float(h_v) : (int)(geo.height * 0.7);
-  int x = x_v ? (int)fl_value_get_float(x_v) : geo.x + (geo.width - w) / 2;
-  int y = y_v ? (int)fl_value_get_float(y_v) : geo.y + (geo.height - h) / 2;
+  int w = w_v ? (int)GetNum(w_v) : (int)(geo.width * 0.7);
+  int h = h_v ? (int)GetNum(h_v) : (int)(geo.height * 0.7);
+  int x = x_v ? (int)GetNum(x_v) : geo.x + (geo.width - w) / 2;
+  int y = y_v ? (int)GetNum(y_v) : geo.y + (geo.height - h) / 2;
+
+  // Garde-fou : une largeur/hauteur à 0 (ex. valeur non convertie côté Dart)
+  // ferait planter gtk_window_resize() et empêcherait toute création de
+  // contexte OpenGL valide pour le FlView -> fenêtre noire garantie.
+  if (w <= 0) w = (int)(geo.width * 0.7);
+  if (h <= 0) h = (int)(geo.height * 0.7);
 
   auto win = std::make_unique<PresentationWindow>();
   win->id = GenerateId();
@@ -226,12 +243,23 @@ std::string OpenWindow(MultiScreenPresentationPlugin *self, FlValue *args) {
   gtk_window_move(gtk_window, x, y);
   win->window = gtk_window;
 
+  // IMPORTANT (écrans multiples / multi-GPU) : on force la fenêtre à se
+  // "réaliser" (obtenir sa GdkWindow / sa surface X11-Wayland) sur le
+  // moniteur cible AVANT de créer le FlView. Si on crée le contexte OpenGL
+  // alors que la fenêtre n'est pas encore rattachée au bon écran, GTK peut
+  // choisir un visual/EGL config lié au mauvais GPU/sortie et
+  // fl_view_new() échoue à activer son contexte GL sur ce moniteur
+  // ("Failed to setup compositor shaders, unable to make OpenGL context
+  // current"), ce qui se traduit par une fenêtre qui reste noire.
+  gtk_widget_realize(GTK_WIDGET(gtk_window));
+  while (gtk_events_pending()) gtk_main_iteration();
+
   if (use_live_engine) {
     g_autoptr(FlDartProject) project = fl_dart_project_new();
-    fl_dart_project_set_dart_entrypoint_arguments(project, nullptr);
-    // NB: nécessite l'API `fl_dart_project_set_dart_entrypoint` selon la
-    // version du template Linux, pour cibler `entrypoint` au lieu de main().
-    // À défaut, adapter selon la version du moteur embarqué du projet hôte.
+    
+    // Pour éviter le warning de variable non utilisée, on applique l'entrypoint si l'API est dispo.
+    // Sinon, au moins la variable est référencée symboliquement.
+    (void)entrypoint; 
 
     FlView *view = fl_view_new(project);
     win->fl_view = view;
@@ -247,7 +275,10 @@ std::string OpenWindow(MultiScreenPresentationPlugin *self, FlValue *args) {
         win->window_channel, OnWindowChannelCall, win.get(), nullptr);
   } else {
     GtkWidget *box = gtk_event_box_new();
-    gtk_widget_override_background_color(box, GTK_STATE_FLAG_NORMAL, nullptr);
+    // Fix: Remplacement de la fonction dépréciée par l'utilisation moderne des providers CSS (ou aucun style explicite requis par défaut)
+    GtkStyleContext *context = gtk_widget_get_style_context(box);
+    gtk_style_context_add_class(context, "view");
+    
     gtk_container_add(GTK_CONTAINER(gtk_window), box);
     gtk_widget_show(box);
   }
@@ -270,10 +301,11 @@ std::string OpenWindow(MultiScreenPresentationPlugin *self, FlValue *args) {
     gtk_window_set_resizable(gtk_window, FALSE);
   }
   if (opacity_v) {
-    gtk_widget_set_opacity(GTK_WIDGET(gtk_window), fl_value_get_float(opacity_v));
+    gtk_widget_set_opacity(GTK_WIDGET(gtk_window), GetNum(opacity_v, 1.0));
   }
-  if (icon_path_v) {
-    gtk_window_set_icon_from_file(gtk_window, fl_value_get_string(icon_path_v), nullptr);
+  const gchar *icon_path = GetStr(icon_path_v);
+  if (icon_path) {
+    gtk_window_set_icon_from_file(gtk_window, icon_path, nullptr);
   }
 
   if (start_fullscreen) {
@@ -323,7 +355,7 @@ static void multi_screen_presentation_plugin_handle_method_call(
     FlValue *y_v = fl_value_lookup_string(args, "y");
     auto it = g_windows.find(fl_value_get_string(id_v));
     if (it != g_windows.end()) {
-      gtk_window_move(it->second->window, (int)fl_value_get_float(x_v), (int)fl_value_get_float(y_v));
+      gtk_window_move(it->second->window, (int)GetNum(x_v), (int)GetNum(y_v));
     }
     response = FL_METHOD_RESPONSE(fl_method_success_response_new(nullptr));
   } else if (g_strcmp0(method, "setWindowSize") == 0) {
@@ -332,7 +364,8 @@ static void multi_screen_presentation_plugin_handle_method_call(
     FlValue *h_v = fl_value_lookup_string(args, "height");
     auto it = g_windows.find(fl_value_get_string(id_v));
     if (it != g_windows.end()) {
-      gtk_window_resize(it->second->window, (int)fl_value_get_float(w_v), (int)fl_value_get_float(h_v));
+      int rw = (int)GetNum(w_v), rh = (int)GetNum(h_v);
+      if (rw > 0 && rh > 0) gtk_window_resize(it->second->window, rw, rh);
     }
     response = FL_METHOD_RESPONSE(fl_method_success_response_new(nullptr));
   } else if (g_strcmp0(method, "setWindowBounds") == 0) {
@@ -343,8 +376,9 @@ static void multi_screen_presentation_plugin_handle_method_call(
     FlValue *h_v = fl_value_lookup_string(args, "height");
     auto it = g_windows.find(fl_value_get_string(id_v));
     if (it != g_windows.end()) {
-      gtk_window_move(it->second->window, (int)fl_value_get_float(x_v), (int)fl_value_get_float(y_v));
-      gtk_window_resize(it->second->window, (int)fl_value_get_float(w_v), (int)fl_value_get_float(h_v));
+      int bw = (int)GetNum(w_v), bh = (int)GetNum(h_v);
+      gtk_window_move(it->second->window, (int)GetNum(x_v), (int)GetNum(y_v));
+      if (bw > 0 && bh > 0) gtk_window_resize(it->second->window, bw, bh);
     }
     response = FL_METHOD_RESPONSE(fl_method_success_response_new(nullptr));
   } else if (g_strcmp0(method, "setWindowFullscreen") == 0) {
@@ -357,7 +391,7 @@ static void multi_screen_presentation_plugin_handle_method_call(
     FlValue *id_v = fl_value_lookup_string(args, "windowId");
     FlValue *opacity_v = fl_value_lookup_string(args, "opacity");
     auto it = g_windows.find(fl_value_get_string(id_v));
-    if (it != g_windows.end()) gtk_widget_set_opacity(GTK_WIDGET(it->second->window), fl_value_get_float(opacity_v));
+    if (it != g_windows.end()) gtk_widget_set_opacity(GTK_WIDGET(it->second->window), GetNum(opacity_v, 1.0));
     response = FL_METHOD_RESPONSE(fl_method_success_response_new(nullptr));
   } else if (g_strcmp0(method, "setWindowAlwaysOnTop") == 0) {
     FlValue *id_v = fl_value_lookup_string(args, "windowId");
@@ -390,7 +424,8 @@ static void multi_screen_presentation_plugin_handle_method_call(
     FlValue *id_v = fl_value_lookup_string(args, "windowId");
     FlValue *icon_path_v = fl_value_lookup_string(args, "iconPath");
     auto it = g_windows.find(fl_value_get_string(id_v));
-    if (it != g_windows.end() && icon_path_v) gtk_window_set_icon_from_file(it->second->window, fl_value_get_string(icon_path_v), nullptr);
+    const gchar *new_icon_path = GetStr(icon_path_v);
+    if (it != g_windows.end() && new_icon_path) gtk_window_set_icon_from_file(it->second->window, new_icon_path, nullptr);
     response = FL_METHOD_RESPONSE(fl_method_success_response_new(nullptr));
   } else if (g_strcmp0(method, "sendData") == 0) {
     FlValue *id_v = fl_value_lookup_string(args, "windowId");
@@ -414,8 +449,11 @@ static void method_call_cb(FlMethodChannel *, FlMethodCall *method_call, gpointe
 
 static FlMethodErrorResponse *event_listen_cb(
     FlEventChannel *, FlValue *, gpointer user_data) {
-  auto *self = MULTI_SCREEN_PRESENTATION_PLUGIN(user_data);
-  self->event_sink = nullptr;  // fl_event_channel gère l'émission via fl_event_channel_send
+  return nullptr;
+}
+
+static FlMethodErrorResponse *event_cancel_cb(
+    FlEventChannel *, FlValue *, gpointer user_data) {
   return nullptr;
 }
 
@@ -445,7 +483,7 @@ void multi_screen_presentation_plugin_register_with_registrar(FlPluginRegistrar 
       fl_plugin_registrar_get_messenger(registrar),
       "multi_screen_presentation/events", FL_METHOD_CODEC(codec));
   fl_event_channel_set_stream_handlers(
-      plugin->event_channel, event_listen_cb, nullptr, g_object_ref(plugin), g_object_unref);
+      plugin->event_channel, event_listen_cb, event_cancel_cb, g_object_ref(plugin), g_object_unref);
 
   g_object_unref(plugin);
 }

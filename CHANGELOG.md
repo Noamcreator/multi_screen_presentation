@@ -1,3 +1,6 @@
+## 1.0.5
+- Remove the build failed in Linux.
+
 ## 1.0.4
 - In macOS remove the PrivacyInfo file for remove the warning in build.
 
