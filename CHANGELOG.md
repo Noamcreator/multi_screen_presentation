@@ -1,3 +1,7 @@
+## 1.0.6
+
+- iOS (multi_screen_presentation.podspec): Fixed a syntax error on line 9 where an unterminated string literal (s.source_files) was missing its closing single quote. This typo was causing CocoaPods (pod install) to fail during the dependency analysis phase.
+
 ## 1.0.5
 - Remove the build failed in Linux.
 

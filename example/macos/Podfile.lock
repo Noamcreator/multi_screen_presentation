@@ -1,6 +1,6 @@
 PODS:
   - FlutterMacOS (1.0.0)
-  - multi_screen_presentation (1.0.5):
+  - multi_screen_presentation (1.0.6):
     - FlutterMacOS
 
 DEPENDENCIES:
