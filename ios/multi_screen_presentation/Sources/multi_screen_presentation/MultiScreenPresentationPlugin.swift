@@ -24,15 +24,20 @@ public class MultiScreenPresentationPlugin: NSObject, FlutterPlugin {
     let channel = FlutterMethodChannel(name: "multi_screen_presentation", binaryMessenger: registrar.messenger())
     let eventChannel = FlutterEventChannel(name: "multi_screen_presentation/events", binaryMessenger: registrar.messenger())
     let instance = MultiScreenPresentationPlugin()
+    
+    // On attache toujours les canaux pour éviter les erreurs "MissingPluginException" côté Dart
     registrar.addMethodCallDelegate(instance, channel: channel)
     eventChannel.setStreamHandler(instance)
 
-    NotificationCenter.default.addObserver(
-      forName: UIScreen.didConnectNotification, object: nil, queue: .main
-    ) { _ in MultiScreenPresentationPlugin.eventSink?(["type": "screensChanged"]) }
-    NotificationCenter.default.addObserver(
-      forName: UIScreen.didDisconnectNotification, object: nil, queue: .main
-    ) { _ in MultiScreenPresentationPlugin.eventSink?(["type": "screensChanged"]) }
+    // On n'écoute les notifications système d'écrans que sur les appareils compatibles (iPad)
+    if UIDevice.current.userInterfaceIdiom == .pad {
+        NotificationCenter.default.addObserver(
+          forName: UIScreen.didConnectNotification, object: nil, queue: .main
+        ) { _ in MultiScreenPresentationPlugin.eventSink?(["type": "screensChanged"]) }
+        NotificationCenter.default.addObserver(
+          forName: UIScreen.didDisconnectNotification, object: nil, queue: .main
+        ) { _ in MultiScreenPresentationPlugin.eventSink?(["type": "screensChanged"]) }
+    }
   }
 
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {

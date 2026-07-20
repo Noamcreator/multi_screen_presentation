@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'multi_screen_presentation'
-  s.version          = '1.0.6'
+  s.version          = '1.0.7'
   s.summary          = 'A comprehensive Flutter plugin to manage presentation windows on secondary screens with customizable properties.'
   s.homepage         = 'https://github.com/Noamcreator/multi_screen_presentation'
   s.license          = { :file => '../LICENSE' }

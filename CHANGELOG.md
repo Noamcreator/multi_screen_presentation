@@ -1,3 +1,8 @@
+## 1.0.7
+
+- **iOS/SPM**: Fixed a critical compilation issue (`Module 'multi_screen_presentation' not found`) on iOS devices and simulators when building with Flutter's Swift Package Manager (SPM) pipeline. Added the explicit source directory path mapping to `Package.swift`.
+- **iOS/Platform Safety**: Guarded native `UIScreen` observation listeners inside the iOS plugin lifecycle to safely degrade and prevent unnecessary background processing when initialized on non-iPad (iPhone) devices.
+
 ## 1.0.6
 
 - iOS (multi_screen_presentation.podspec): Fixed a syntax error on line 9 where an unterminated string literal (s.source_files) was missing its closing single quote. This typo was causing CocoaPods (pod install) to fail during the dependency analysis phase.
