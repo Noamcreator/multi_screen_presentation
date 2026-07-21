@@ -2,7 +2,7 @@ PODS:
   - device_info_plus (0.0.1):
     - FlutterMacOS
   - FlutterMacOS (1.0.0)
-  - multi_screen_presentation (1.0.8):
+  - multi_screen_presentation (1.0.9):
     - FlutterMacOS
 
 DEPENDENCIES:

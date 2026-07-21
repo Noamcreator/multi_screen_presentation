@@ -207,7 +207,22 @@ class _PresentationPageState extends State<PresentationPage> {
 // 3. APPLICATION PRINCIPALE (LA TÉLÉCOMMANDE)
 // =========================================================================
 
-void main() {
+void main(List<String> args) {
+  // Sur Linux, il n'existe pas d'API pour lancer un FlView sur un
+  // entrypoint Dart nommé différent de main() (limitation du moteur
+  // Flutter, cf. flutter/flutter#86599). Le plugin transmet donc
+  // l'entrypoint voulu via les arguments de ligne de commande de l'isolate
+  // (--entrypoint <nom>), et c'est à nous de dispatcher manuellement ici.
+  final entryIndex = args.indexOf('--entrypoint');
+  final entrypoint = (entryIndex != -1 && entryIndex + 1 < args.length)
+      ? args[entryIndex + 1]
+      : null;
+
+  if (entrypoint == 'presentationMain') {
+    presentationMain();
+    return;
+  }
+
   runApp(const MyApp());
 }
 

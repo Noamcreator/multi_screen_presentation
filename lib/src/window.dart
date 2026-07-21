@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'models.dart';
-import 'multi_screen_presentation_platform_interface.dart';
+import '../multi_screen_presentation_platform_interface.dart';
 
 /// Représente une fenêtre de présentation ouverte sur un écran.
 ///

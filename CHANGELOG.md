@@ -1,3 +1,16 @@
+## 1.0.9
+
+# Fixed
+- **Int/float type mismatch** (`models.dart`, `multi_screen_presentation_method_channel.dart`): `x`, `y`, `width`, `height` were sent as Dart `int`, but the native code read them with `fl_value_get_float()`, which requires `FL_VALUE_TYPE_FLOAT`. This triggered GLib assertion failures and silently collapsed window geometry to `0`. Fixed by sending `.toDouble()` from Dart.
+- **Unsafe native value reads** (`multi_screen_presentation_plugin.cc`): added `GetNum()`/`GetStr()` helpers that check the `FlValue` type before reading (int or float, string or null), instead of asserting/crashing on mismatch. Also guards against `width`/`height` ever being `0`.
+- **Black window on secondary screen**: the `GtkWindow` is now realized (`gtk_widget_realize`) and pumped through the event loop *before* the `FlView`/OpenGL context is created, so GTK picks the correct visual/EGL config for the target monitor.
+- **Wrong Dart entrypoint on secondary windows**: the plugin read the `entrypoint` argument but never applied it (`(void)entrypoint;` — dead code). Linux has no API to launch a named Dart entrypoint on a new engine, so the entrypoint is now passed as a CLI arg (`fl_dart_project_set_dart_entrypoint_arguments`) and `main(List<String> args)` in the app dispatches to `presentationMain()` manually.
+- **`MissingPluginException` on secondary windows**: each secondary window runs its own `FlEngine`, which had zero plugins registered (`fl_register_plugins` was only called for the main window). Added a `multi_screen_presentation_plugin_set_view_created_callback()` hook that `my_application.cc` uses to register plugins on every new secondary view.
+- **Intermittent GLX `BadAccess` crash on window close**: `closeWindow` destroyed the `GtkWindow` synchronously, racing with the engine's raster thread still using its GL context. Now shares the same safe, deferred (`g_idle_add`) teardown path as the native window-close (`×` button) handler, and properly cleans up the `g_windows` map in both cases (previously `closeWindow` left a stale/dangling entry).
+
+# Files touched
+`lib/src/models.dart`, `lib/src/multi_screen_presentation_method_channel.dart`, `linux/multi_screen_presentation_plugin.cc`, `linux/include/multi_screen_presentation/multi_screen_presentation_plugin.h`, `example/linux/runner/my_application.cc`, `example/lib/main.dart`
+
 ## 1.0.8
 
 - Fixed iOS build failure.

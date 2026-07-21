@@ -4,7 +4,7 @@
 #
 Pod::Spec.new do |s|
   s.name             = 'multi_screen_presentation'
-  s.version          = '1.0.8'
+  s.version          = '1.0.9'
   s.summary          = 'A comprehensive Flutter plugin to manage presentation windows on secondary screens with customizable properties.'
   s.description      = <<-DESC
   A comprehensive Flutter plugin to manage presentation windows on secondary screens with customizable properties.

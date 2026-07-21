@@ -11,6 +11,7 @@ G_BEGIN_DECLS
 #define FLUTTER_PLUGIN_EXPORT
 #endif
 
+// Définition de la structure GObject du plugin pour que les types soient reconnus
 typedef struct _MultiScreenPresentationPlugin MultiScreenPresentationPlugin;
 typedef struct {
   GObjectClass parent_class;
@@ -18,9 +19,15 @@ typedef struct {
 
 FLUTTER_PLUGIN_EXPORT GType multi_screen_presentation_plugin_get_type();
 
+// Callback pour enregistrer les plugins sur les fenêtres secondaires
+typedef void (*MultiScreenPresentationViewCreatedCallback)(FlView* view);
+
 FLUTTER_PLUGIN_EXPORT void multi_screen_presentation_plugin_register_with_registrar(
-    FlPluginRegistrar *registrar);
+    FlPluginRegistrar* registrar);
+
+FLUTTER_PLUGIN_EXPORT void multi_screen_presentation_plugin_set_view_created_callback(
+    MultiScreenPresentationViewCreatedCallback callback);
 
 G_END_DECLS
 
-#endif
+#endif  // FLUTTER_PLUGIN_MULTI_SCREEN_PRESENTATION_PLUGIN_H_

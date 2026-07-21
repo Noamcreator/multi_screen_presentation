@@ -21,6 +21,17 @@ G_DEFINE_TYPE(MultiScreenPresentationPlugin, multi_screen_presentation_plugin, g
   (G_TYPE_CHECK_INSTANCE_CAST((obj), multi_screen_presentation_plugin_get_type(), \
    MultiScreenPresentationPlugin))
 
+// Callback fourni par l'app hôte (my_application.cc) pour enregistrer les
+// plugins natifs sur chaque nouvelle FlView de fenêtre secondaire.
+static MultiScreenPresentationViewCreatedCallback g_view_created_callback = nullptr;
+
+extern "C" {
+void multi_screen_presentation_plugin_set_view_created_callback(
+    MultiScreenPresentationViewCreatedCallback callback) {
+  g_view_created_callback = callback;
+}
+}
+
 namespace {
 
 struct PresentationWindow {
@@ -176,20 +187,48 @@ void OnWindowChannelCall(FlMethodChannel *, FlMethodCall *method_call, gpointer 
   fl_method_call_respond(method_call, response, nullptr);
 }
 
-gboolean OnDeleteEvent(GtkWidget *, GdkEvent *, gpointer user_data) {
-  auto *w = static_cast<PresentationWindow *>(user_data);
+// Ferme une fenêtre de façon sûre : on la cache immédiatement (retour visuel
+// instantané), puis on diffère la VRAIE destruction GTK (et le nettoyage de
+// g_windows) via g_idle_add. C'est important : si on détruit la GtkWindow de
+// façon synchrone (gtk_widget_destroy direct dans le handler de méthode),
+// on peut le faire pendant que le thread de rendu du moteur Flutter est
+// encore en train d'utiliser le contexte GL/GLX de cette fenêtre -> erreur X
+// "BadAccess (attempt to access private resource denied)" et crash de tout
+// le process (observé de façon intermittente). Différer via g_idle_add laisse
+// le temps au moteur de terminer proprement avant que GTK ne détruise le
+// widget et son contexte GL.
+void CloseWindowById(const std::string &id) {
+  auto it = g_windows.find(id);
+  if (it == g_windows.end()) return;
+  PresentationWindow *w = it->second.get();
+
+  if (w->window_channel) {
+    fl_method_channel_set_method_call_handler(w->window_channel, nullptr, nullptr, nullptr);
+  }
+  gtk_widget_hide(GTK_WIDGET(w->window));
+
   g_autoptr(FlValue) event = fl_value_new_map();
   fl_value_set_string_take(event, "type", fl_value_new_string("closed"));
-  fl_value_set_string_take(event, "windowId", fl_value_new_string(w->id.c_str()));
+  fl_value_set_string_take(event, "windowId", fl_value_new_string(id.c_str()));
   EmitEvent(w->plugin, event);
-  std::string id = w->id;
+
   g_idle_add([](gpointer data) -> gboolean {
     auto *id_str = static_cast<std::string *>(data);
-    g_windows.erase(*id_str);
+    auto found = g_windows.find(*id_str);
+    if (found != g_windows.end()) {
+      gtk_widget_destroy(GTK_WIDGET(found->second->window));
+      g_windows.erase(found);
+    }
     delete id_str;
     return G_SOURCE_REMOVE;
   }, new std::string(id));
-  return FALSE;  
+}
+
+gboolean OnDeleteEvent(GtkWidget *, GdkEvent *, gpointer user_data) {
+  auto *w = static_cast<PresentationWindow *>(user_data);
+  CloseWindowById(w->id);
+  return TRUE;  // on gère nous-mêmes la destruction (différée) ; on empêche
+                // GTK de la faire immédiatement en plus via son handler par défaut.
 }
 
 std::string OpenWindow(MultiScreenPresentationPlugin *self, FlValue *args) {
@@ -217,7 +256,7 @@ std::string OpenWindow(MultiScreenPresentationPlugin *self, FlValue *args) {
 
   // Fix warning unused: On récupère et utilise la variable optionnelle pour le FlDartProject
   FlValue *entry_v = fl_value_lookup_string(args, "entrypoint");
-  const char *entrypoint = entry_v ? fl_value_get_string(entry_v) : "presentationMain";
+  const char *entrypoint = GetStr(entry_v, "presentationMain");
 
   GdkMonitor *monitor = FindMonitor(screen_id);
   GdkRectangle geo; gdk_monitor_get_geometry(monitor, &geo);
@@ -256,10 +295,21 @@ std::string OpenWindow(MultiScreenPresentationPlugin *self, FlValue *args) {
 
   if (use_live_engine) {
     g_autoptr(FlDartProject) project = fl_dart_project_new();
-    
-    // Pour éviter le warning de variable non utilisée, on applique l'entrypoint si l'API est dispo.
-    // Sinon, au moins la variable est référencée symboliquement.
-    (void)entrypoint; 
+
+    // IMPORTANT (limitation connue du moteur Flutter sur Linux) : contrairement
+    // à Windows/macOS/Android, FlDartProject n'expose AUCUNE API pour choisir
+    // un entrypoint Dart personnalisé (pas de fl_dart_project_set_dart_entrypoint,
+    // voir https://github.com/flutter/flutter/issues/86599, toujours ouvert).
+    // fl_view_new() exécutera donc TOUJOURS main() par défaut. On contourne en
+    // passant l'entrypoint voulu comme argument de ligne de commande Dart ; côté
+    // Dart, main(List<String> args) doit lire "--entrypoint" et dispatcher
+    // lui-même vers la bonne fonction (voir main.dart).
+    gchar *entry_argv[] = {
+        const_cast<gchar *>("--entrypoint"),
+        const_cast<gchar *>(entrypoint),
+        nullptr,
+    };
+    fl_dart_project_set_dart_entrypoint_arguments(project, entry_argv);
 
     FlView *view = fl_view_new(project);
     win->fl_view = view;
@@ -267,6 +317,17 @@ std::string OpenWindow(MultiScreenPresentationPlugin *self, FlValue *args) {
     gtk_widget_show(GTK_WIDGET(view));
 
     win->engine = fl_view_get_engine(view);
+
+    // Ce nouveau moteur n'a par défaut AUCUN plugin natif enregistré (ni le
+    // nôtre, ni ceux d'autres packages) : fl_register_plugins() n'est appelé
+    // que sur la vue principale, dans my_application.cc. Sans ce callback,
+    // tout MethodChannel/EventChannel appelé depuis cette fenêtre secondaire
+    // échoue avec MissingPluginException - y compris multi_screen_presentation
+    // lui-même si jamais le mauvais entrypoint venait à s'exécuter.
+    if (g_view_created_callback) {
+      g_view_created_callback(view);
+    }
+
     win->window_channel = fl_method_channel_new(
         fl_engine_get_binary_messenger(win->engine),
         "multi_screen_presentation/window",
@@ -334,8 +395,7 @@ static void multi_screen_presentation_plugin_handle_method_call(
     response = FL_METHOD_RESPONSE(fl_method_success_response_new(v));
   } else if (g_strcmp0(method, "closeWindow") == 0) {
     FlValue *id_v = fl_value_lookup_string(args, "windowId");
-    auto it = g_windows.find(fl_value_get_string(id_v));
-    if (it != g_windows.end()) gtk_widget_destroy(GTK_WIDGET(it->second->window));
+    if (id_v) CloseWindowById(fl_value_get_string(id_v));
     response = FL_METHOD_RESPONSE(fl_method_success_response_new(nullptr));
   } else if (g_strcmp0(method, "toggleWindowMode") == 0) {
     FlValue *id_v = fl_value_lookup_string(args, "windowId");

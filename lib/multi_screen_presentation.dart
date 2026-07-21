@@ -5,7 +5,7 @@ export 'src/window.dart';
 import 'dart:async'; // Ajouté pour le StreamController
 import 'package:flutter/services.dart'; // Ajouté pour le MethodChannel
 import 'src/models.dart';
-import 'src/multi_screen_presentation_platform_interface.dart';
+import 'multi_screen_presentation_platform_interface.dart';
 import 'src/window.dart';
 import 'src/screen_info.dart';
 

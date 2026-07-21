@@ -6,6 +6,7 @@
 #endif
 
 #include "flutter/generated_plugin_registrant.h"
+#include "multi_screen_presentation/multi_screen_presentation_plugin.h"
 
 struct _MyApplication {
   GtkApplication parent_instance;
@@ -17,6 +18,15 @@ G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
 // Called when first Flutter frame received.
 static void first_frame_cb(MyApplication* self, FlView* view) {
   gtk_widget_show(gtk_widget_get_toplevel(GTK_WIDGET(view)));
+}
+
+// Enregistre les plugins natifs (dont multi_screen_presentation lui-même)
+// sur le moteur Flutter de chaque fenêtre secondaire créée par le plugin
+// multi_screen_presentation. Sans ça, ces fenêtres n'ont aucun handler pour
+// les MethodChannel/EventChannel -> MissingPluginException dès qu'elles
+// essaient d'appeler du code natif.
+static void register_plugins_on_secondary_view(FlView* view) {
+  fl_register_plugins(FL_PLUGIN_REGISTRY(view));
 }
 
 // Implements GApplication::activate.
@@ -74,6 +84,12 @@ static void my_application_activate(GApplication* application) {
   gtk_widget_realize(GTK_WIDGET(view));
 
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
+
+  // Toute fenêtre secondaire ouverte plus tard par le plugin
+  // multi_screen_presentation (fl_view_new() sur un moteur séparé) doit
+  // aussi avoir ses plugins enregistrés, sinon MissingPluginException.
+  multi_screen_presentation_plugin_set_view_created_callback(
+      register_plugins_on_secondary_view);
 
   gtk_widget_grab_focus(GTK_WIDGET(view));
 }
